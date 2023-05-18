@@ -1,41 +1,24 @@
 <script setup>
 import * as THREE from 'three'
 import * as dat from 'dat.gui'
-import {onBeforeUnmount, onMounted} from "vue";
+import {onBeforeUnmount, onMounted, ref, watch} from "vue";
 import {DRACOLoader} from "three/examples/jsm/loaders/DRACOLoader";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 
-var blockId = 1
+const blockId = ref(2);
+const scene = new THREE.Scene()
+let gltfLoader = null;
+let mixer = null;
 
-// 处理接收到的消息
-function handleMessage(event) {
-  if (event.data && event.data.type === 'blockId') {
-    blockId = event.data.data;
-    console.log('Received blockId:', blockId);
+const updateModel = () => {
+  if (!gltfLoader) {
+    return;
   }
-}
-
-onMounted(() => {
-
-  window.addEventListener('message', handleMessage);
-
-  /**
-   * Models
-   */
-  const gui = new dat.GUI()
-  const scene = new THREE.Scene()
-  const canvas = document.getElementById("canvas")
-
-  const dracoLoader = new DRACOLoader()
-  dracoLoader.setDecoderPath('/draco/')
-
-  const gltfLoader = new GLTFLoader()
-  gltfLoader.setDRACOLoader(dracoLoader)
-  let mixer = null
   gltfLoader.load(
-      'https://blockdream-imagebed-1310215785.cos.ap-shanghai.myqcloud.com/models/' + blockId.toString() + '.gltf',
+      "https://blockdream-imagebed-1310215785.cos.ap-shanghai.myqcloud.com/models/" + blockId.value.toString() + ".gltf",
       (gltf) => {
+
         gltf.scene.scale.set(0.01, 0.01, 0.01)
         gltf.scene.rotation.x = -Math.PI / 2;
 
@@ -47,6 +30,39 @@ onMounted(() => {
         action.play()
       }
   )
+}
+
+// 处理接收到的消息
+function handleMessage(event) {
+  if (event.data && event.data.type === 'blockId') {
+    blockId.value = event.data.data
+    // 移除旧模型
+    scene.children.forEach(child => {
+      if (child.type === 'Group') {
+        scene.remove(child);
+      }
+    });
+    updateModel()
+    console.log('Received blockId:', blockId)
+  }
+}
+
+onMounted(() => {
+
+  window.addEventListener('message', handleMessage);
+
+  /**
+   * Models
+   */
+  const gui = new dat.GUI()
+  const canvas = document.getElementById("canvas")
+
+  const dracoLoader = new DRACOLoader()
+  dracoLoader.setDecoderPath('/draco/')
+  gltfLoader = new GLTFLoader()
+  gltfLoader.setDRACOLoader(dracoLoader)
+
+  updateModel()
 
   /**
    * Lights
